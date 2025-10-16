@@ -21,7 +21,7 @@ jobs:
 
       - name: Install deps
         run: |
-          if [ -f yarn.lock ]; then yarn --frozen-lockfile;             elif [ -f pnpm-lock.yaml ]; then corepack enable && pnpm i --frozen-lockfile;             elif [ -f package-lock.json ]; then npm ci;             else npm i; fi
+          if [ -f yarn.lock ]; then yarn --frozen-lockfile;           elif [ -f pnpm-lock.yaml ]; then corepack enable && pnpm i --frozen-lockfile;           elif [ -f package-lock.json ]; then npm ci;           else npm i; fi
 
       - name: Build
         run: npm run build
@@ -38,7 +38,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}:latest
+          tags: ghcr.io/tisat83/2pac:latest
           build-args: |
             GIT_SHA=${{ github.sha }}
 
