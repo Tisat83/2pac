@@ -1,0 +1,7 @@
+{
+  "/page": "/",
+  "/about/page": "/about",
+  "/sitemap/page": "/sitemap",
+  "/contacts/page": "/contacts",
+  "/api/health/route": "/api/health"
+}
