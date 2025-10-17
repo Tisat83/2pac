@@ -1,7 +1,11 @@
 export async function GET() {
+  const { COMMIT, VERSION, SERVICE_NAME } = process.env;
+
   return Response.json({
     status: 'ok',
-    app: '2pac',
+    service: SERVICE_NAME || '2pac.ru',
+    commit: COMMIT ?? null,
+    version: VERSION ?? null,
     timestamp: new Date().toISOString(),
-  })
+  });
 }
