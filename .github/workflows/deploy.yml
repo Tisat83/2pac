@@ -27,6 +27,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node to read package version
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Export PACKAGE_VERSION
+        id: pkg
+        run: echo "PACKAGE_VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
+
       - name: Prepare SSH key
         run: |
           set -eu
@@ -46,12 +55,23 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           set -eu
-          rsync -az --delete \
-            --exclude ".git" \
-            --exclude "node_modules" \
-            --exclude ".next" \
-            -e "ssh -i ~/.ssh/id_ci" \
-            ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
+          rsync -az --delete             --exclude ".git"             --exclude "node_modules"             --exclude ".next"             -e "ssh -i ~/.ssh/id_ci"             ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
+
+      - name: Write release .env on server (COMMIT, VERSION)
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -eu
+          ssh -i ~/.ssh/id_ci "${DEPLOY_USER}@${DEPLOY_HOST}" << EOF
+            set -euo pipefail
+            cd "${DEPLOY_PATH}"
+            cat > .env <<EOT
+            COMMIT=${GITHUB_SHA::7}
+            VERSION=${PACKAGE_VERSION}
+            EOT
+          EOF
 
       - name: Compose up on server
         env:
@@ -63,8 +83,30 @@ jobs:
           ssh -i ~/.ssh/id_ci "${DEPLOY_USER}@${DEPLOY_HOST}" << EOF
             set -euo pipefail
             cd "${DEPLOY_PATH}"
+            docker compose down || true
+            docker ps --filter "publish=3005" --format "{{.ID}}" | xargs -r docker stop
+            docker ps -a --filter "publish=3005" --format "{{.ID}}" | xargs -r docker rm
             docker compose pull || true
             docker compose build --pull
             docker compose up -d --remove-orphans
             docker compose ps
           EOF
+
+      - name: Post-deploy health check
+        run: |
+          set -eu
+          URL="http://2pac.ru/api/health"
+          echo "Checking $URL ..."
+          for i in $(seq 1 30); do
+            CODE=$(curl -s -o /tmp/health.json -w "%{http_code}" "$URL" || true)
+            if [ "$CODE" = "200" ] && grep -q '"status":"ok"' /tmp/health.json; then
+              echo "Health OK:"
+              cat /tmp/health.json
+              exit 0
+            fi
+            echo "Try #$i: code=$CODE, waiting..."
+            sleep 4
+          done
+          echo "Health check failed. Last body:"
+          cat /tmp/health.json || true
+          exit 1
