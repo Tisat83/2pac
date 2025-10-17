@@ -1,0 +1,29 @@
+# Speed up Docker builds by shrinking the context and avoiding secrets
+.git
+.gitignore
+.github
+node_modules
+.next
+dist
+build
+out
+coverage
+**/*.log
+**/*.bak
+
+# Local env and editor junk
+.env
+.env.*
+*.local
+.vscode
+.idea
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Archives and temp
+*.zip
+*.tar
+*.tgz
+tmp/
