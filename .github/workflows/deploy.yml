@@ -37,8 +37,10 @@ jobs:
           node - <<'NODE'
           const fs = require('fs');
           const v = require('./package.json').version;
-          fs.appendFileSync(process.env.GITHUB_ENV, `PACKAGE_VERSION=${v}\n`);
-          fs.appendFileSync(process.env.GITHUB_ENV, `GITHUB_SHA_SHORT=${process.env.GITHUB_SHA.slice(0,7)}\n`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `PACKAGE_VERSION=${v}
+`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `GITHUB_SHA_SHORT=${process.env.GITHUB_SHA.slice(0,7)}
+`);
           NODE
 
       - name: Prepare SSH key
@@ -74,9 +76,9 @@ jobs:
             set -euo pipefail
             cd "${DEPLOY_PATH}"
             cat > .env <<EOT
-COMMIT=${GITHUB_SHA_SHORT}
-VERSION=${PACKAGE_VERSION}
-EOT
+            COMMIT=${GITHUB_SHA_SHORT}
+            VERSION=${PACKAGE_VERSION}
+            EOT
             echo "Wrote .env:"
             cat .env
           EOF
