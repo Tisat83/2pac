@@ -1,33 +1,17 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import Link from "next/link";
-import { clsx } from "clsx";
+import './globals.css'
+import { ReactNode } from 'react'
 
-export const metadata: Metadata = {
-  title: "New Site",
-  description: "Next.js + TS + Tailwind + PWA starter",
-  manifest: "/manifest.webmanifest",
-  icons: [{ rel: "icon", url: "/favicon.ico" }],
-  themeColor: "#111827"
-};
+export const metadata = {
+  title: '2pac — Легенда хип-хопа',
+  description: 'Сайт, посвящённый Тупаку Шакуру — биография, музыка, жизнь.',
+}
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ru">
-      <body className={clsx("min-h-screen flex flex-col")}>
-        <header className="border-b">
-          <nav className="container py-3 flex gap-4">
-            <Link href="/" className="font-semibold">Главная</Link>
-            <Link href="/about">О нас</Link>
-            <Link href="/contacts">Контакты</Link>
-            <Link href="/sitemap">Разделы</Link>
-          </nav>
-        </header>
-        <main className="container py-8 flex-1">{children}</main>
-        <footer className="border-t text-sm text-gray-500">
-          <div className="container py-6">© {new Date().getFullYear()} New Site</div>
-        </footer>
+    <html lang="ru" suppressHydrationWarning>
+      <body className="bg-light text-dark dark:bg-dark dark:text-white transition-colors duration-300">
+        {children}
       </body>
     </html>
-  );
+  )
 }

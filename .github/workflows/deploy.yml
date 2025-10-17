@@ -1,55 +1,28 @@
-name: CI/CD
+name: Deploy to VPS
+
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    branches:
+      - main
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          node-version: '20'
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Install deps
+      - name: Deploy to VPS
         run: |
-          if [ -f yarn.lock ]; then yarn --frozen-lockfile;           elif [ -f pnpm-lock.yaml ]; then corepack enable && pnpm i --frozen-lockfile;           elif [ -f package-lock.json ]; then npm ci;           else npm i; fi
+          rsync -az --delete ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/www-root/data/www/2pac.ru
 
-      - name: Build
-        run: npm run build
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build & push image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ghcr.io/tisat83/2pac:latest
-          build-args: |
-            GIT_SHA=${{ github.sha }}
-
-      - name: Deploy via SSH (docker-compose pull & up -d)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script: |
-            cd ${{ secrets.DEPLOY_PATH }}
-            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GHCR_PAT }}
-            docker compose pull
-            docker compose up -d --remove-orphans
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            cd /var/www/www-root/data/www/2pac.ru
+            docker compose up -d --build
+          EOF
