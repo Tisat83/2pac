@@ -110,3 +110,26 @@ jobs:
           echo "Health check failed. Last body:"
           cat /tmp/health.json || true
           exit 1
+      - name: Compose up on server
+        run: |
+          set -eu
+          ssh -i ~/.ssh/id_ci "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" << EOF
+            set -euo pipefail
+            export DOCKER_BUILDKIT=1
+            export COMPOSE_DOCKER_CLI_BUILD=1
+            cd "${{ secrets.DEPLOY_PATH }}"
+
+            # Stop stack and free Apache proxy port (3005)
+            docker compose down || true
+            docker ps --filter "publish=3005" --format "{{.ID}}" | xargs -r docker stop
+            docker ps -a --filter "publish=3005" --format "{{.ID}}" | xargs -r docker rm
+
+            # Build with cache and run
+            docker compose pull || true
+            docker compose build --pull
+            docker compose up -d --remove-orphans
+            docker compose ps
+
+            # Optional: prune dangling images
+            docker image prune -f --filter "dangling=true" || true
+          EOF
