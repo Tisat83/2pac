@@ -32,9 +32,14 @@ jobs:
         with:
           node-version: '18'
 
-- name: Export PACKAGE_VERSION and SHORT SHA
-  run: |
-    node -e "const fs=require('fs');const v=require('./package.json').version;fs.appendFileSync(process.env.GITHUB_ENV,`PACKAGE_VERSION=${v}\n`);fs.appendFileSync(process.env.GITHUB_ENV,`GITHUB_SHA_SHORT=${process.env.GITHUB_SHA.slice(0,7)}\n`);"
+      - name: Export PACKAGE_VERSION and SHORT SHA
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const v = require('./package.json').version;
+          fs.appendFileSync(process.env.GITHUB_ENV, `PACKAGE_VERSION=${v}\n`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `GITHUB_SHA_SHORT=${process.env.GITHUB_SHA.slice(0,7)}\n`);
+          NODE
 
       - name: Prepare SSH key
         run: |
@@ -55,12 +60,7 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           set -eu
-          rsync -az --delete \
-            --exclude ".git" \
-            --exclude "node_modules" \
-            --exclude ".next" \
-            -e "ssh -i ~/.ssh/id_ci" \
-            ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
+          rsync -az --delete             --exclude ".git"             --exclude "node_modules"             --exclude ".next"             -e "ssh -i ~/.ssh/id_ci"             ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
 
       - name: Write release .env on server (COMMIT, VERSION)
         env:
@@ -69,7 +69,17 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           set -eu
-          ssh -i ~/.ssh/id_ci "${DEPLOY_USER}@${DEPLOY_HOST}" "cd \"${DEPLOY_PATH}\" && printf 'COMMIT=%s\nVERSION=%s\n' \"$GITHUB_SHA_SHORT\" \"$PACKAGE_VERSION\" > .env && echo 'Wrote .env:' && cat .env"
+          # Use heredoc where runner variables expand (unquoted EOF)
+          ssh -i ~/.ssh/id_ci "${DEPLOY_USER}@${DEPLOY_HOST}" << EOF
+            set -euo pipefail
+            cd "${DEPLOY_PATH}"
+            cat > .env <<EOT
+COMMIT=${GITHUB_SHA_SHORT}
+VERSION=${PACKAGE_VERSION}
+EOT
+            echo "Wrote .env:"
+            cat .env
+          EOF
 
       - name: Compose up on server
         run: |
@@ -79,13 +89,9 @@ jobs:
             export DOCKER_BUILDKIT=1
             export COMPOSE_DOCKER_CLI_BUILD=1
             cd "${{ secrets.DEPLOY_PATH }}"
-
-            # Остановим стек и освободим порт Apache-прокси (3005)
             docker compose down || true
             docker ps --filter "publish=3005" --format "{{.ID}}" | xargs -r docker stop
             docker ps -a --filter "publish=3005" --format "{{.ID}}" | xargs -r docker rm
-
-            # Собираем с кэшем и запускаем
             docker compose pull || true
             docker compose build --pull
             docker compose up -d --remove-orphans
