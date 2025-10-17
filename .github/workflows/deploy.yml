@@ -37,10 +37,10 @@ jobs:
           node - <<'NODE'
           const fs = require('fs');
           const v = require('./package.json').version;
-          fs.appendFileSync(process.env.GITHUB_ENV, `PACKAGE_VERSION=${v}
-`);
-          fs.appendFileSync(process.env.GITHUB_ENV, `GITHUB_SHA_SHORT=${process.env.GITHUB_SHA.slice(0,7)}
-`);
+          fs.appendFileSync(process.env.GITHUB_ENV, 'PACKAGE_VERSION=' + v + '
+');
+          fs.appendFileSync(process.env.GITHUB_ENV, 'GITHUB_SHA_SHORT=' + process.env.GITHUB_SHA.slice(0,7) + '
+');
           NODE
 
       - name: Prepare SSH key
@@ -62,7 +62,12 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           set -eu
-          rsync -az --delete             --exclude ".git"             --exclude "node_modules"             --exclude ".next"             -e "ssh -i ~/.ssh/id_ci"             ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
+          rsync -az --delete \
+            --exclude ".git" \
+            --exclude "node_modules" \
+            --exclude ".next" \
+            -e "ssh -i ~/.ssh/id_ci" \
+            ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}" 
 
       - name: Write release .env on server (COMMIT, VERSION)
         env:
