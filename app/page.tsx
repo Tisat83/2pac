@@ -4,8 +4,8 @@ import BiographyBlock from "@/components/BiographyBlock";
 export default function Home() {
   return (
     <>
-      <HeroSection />
-      <BiographyTeaser />
+      <HeroBlock />
+      <BiographyBlock />
     </>
-  )
+  );
 }
