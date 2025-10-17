@@ -33,8 +33,7 @@ jobs:
           node-version: '18'
 
       - name: Export PACKAGE_VERSION
-        id: pkg
-        run: echo "PACKAGE_VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
+        run: echo "PACKAGE_VERSION=$(node -p \"require('./package.json').version\")" >> $GITHUB_ENV
 
       - name: Prepare SSH key
         run: |
@@ -55,7 +54,12 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           set -eu
-          rsync -az --delete             --exclude ".git"             --exclude "node_modules"             --exclude ".next"             -e "ssh -i ~/.ssh/id_ci"             ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
+          rsync -az --delete \
+            --exclude ".git" \
+            --exclude "node_modules" \
+            --exclude ".next" \
+            -e "ssh -i ~/.ssh/id_ci" \
+            ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
 
       - name: Write release .env on server (COMMIT, VERSION)
         env:
@@ -64,28 +68,33 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           set -eu
+          # Пишем .env на сервере, чтобы docker compose подставил значения
           ssh -i ~/.ssh/id_ci "${DEPLOY_USER}@${DEPLOY_HOST}" << EOF
             set -euo pipefail
             cd "${DEPLOY_PATH}"
             cat > .env <<EOT
-            COMMIT=${GITHUB_SHA::7}
-            VERSION=${PACKAGE_VERSION}
-            EOT
+COMMIT=${GITHUB_SHA::7}
+VERSION=${PACKAGE_VERSION}
+EOT
+            echo "Wrote .env:"
+            cat .env
           EOF
 
       - name: Compose up on server
-        env:
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           set -eu
-          ssh -i ~/.ssh/id_ci "${DEPLOY_USER}@${DEPLOY_HOST}" << EOF
+          ssh -i ~/.ssh/id_ci "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" << EOF
             set -euo pipefail
-            cd "${DEPLOY_PATH}"
+            export DOCKER_BUILDKIT=1
+            export COMPOSE_DOCKER_CLI_BUILD=1
+            cd "${{ secrets.DEPLOY_PATH }}"
+
+            # Остановим стек и освободим порт Apache-прокси (3005)
             docker compose down || true
             docker ps --filter "publish=3005" --format "{{.ID}}" | xargs -r docker stop
             docker ps -a --filter "publish=3005" --format "{{.ID}}" | xargs -r docker rm
+
+            # Собираем с кэшем и запускаем
             docker compose pull || true
             docker compose build --pull
             docker compose up -d --remove-orphans
@@ -110,26 +119,3 @@ jobs:
           echo "Health check failed. Last body:"
           cat /tmp/health.json || true
           exit 1
-      - name: Compose up on server
-        run: |
-          set -eu
-          ssh -i ~/.ssh/id_ci "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" << EOF
-            set -euo pipefail
-            export DOCKER_BUILDKIT=1
-            export COMPOSE_DOCKER_CLI_BUILD=1
-            cd "${{ secrets.DEPLOY_PATH }}"
-
-            # Stop stack and free Apache proxy port (3005)
-            docker compose down || true
-            docker ps --filter "publish=3005" --format "{{.ID}}" | xargs -r docker stop
-            docker ps -a --filter "publish=3005" --format "{{.ID}}" | xargs -r docker rm
-
-            # Build with cache and run
-            docker compose pull || true
-            docker compose build --pull
-            docker compose up -d --remove-orphans
-            docker compose ps
-
-            # Optional: prune dangling images
-            docker image prune -f --filter "dangling=true" || true
-          EOF
