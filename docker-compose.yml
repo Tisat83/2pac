@@ -2,7 +2,10 @@ version: "3.9"
 
 services:
   web:
-    image: ghcr.io/tisat83/2pac:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: 2pacru-web:latest
     container_name: 2pacru-web
     restart: unless-stopped
     environment:
