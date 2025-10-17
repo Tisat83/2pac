@@ -27,10 +27,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Add SSH known host
+      - name: Prepare SSH key
         run: |
+          set -eu
+          umask 077
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ci
+          chmod 600 ~/.ssh/id_ci
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Test SSH connectivity
+        run: ssh -i ~/.ssh/id_ci "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "echo ok"
 
       - name: Sync repo to server (rsync)
         env:
@@ -38,7 +45,13 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          rsync -az --delete                 --exclude ".git"                 --exclude "node_modules"                 --exclude ".next"                 ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH"
+          set -eu
+          rsync -az --delete \
+            --exclude ".git" \
+            --exclude "node_modules" \
+            --exclude ".next" \
+            -e "ssh -i ~/.ssh/id_ci" \
+            ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
 
       - name: Compose up on server
         env:
@@ -46,9 +59,10 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          ssh "$DEPLOY_USER@$DEPLOY_HOST" << 'EOF'
+          set -eu
+          ssh -i ~/.ssh/id_ci "${DEPLOY_USER}@${DEPLOY_HOST}" << 'EOF'
             set -euo pipefail
-            cd "$DEPLOY_PATH"
+            cd "${DEPLOY_PATH}"
             docker compose pull || true
             docker compose build --pull
             docker compose up -d --remove-orphans
