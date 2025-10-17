@@ -60,9 +60,9 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           set -eu
-          ssh -i ~/.ssh/id_ci "${DEPLOY_USER}@${DEPLOY_HOST}" << 'EOF'
+          ssh -i ~/.ssh/id_ci "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" << EOF
             set -euo pipefail
-            cd "${DEPLOY_PATH}"
+            cd "${{ secrets.DEPLOY_PATH }}"
             docker compose pull || true
             docker compose build --pull
             docker compose up -d --remove-orphans
