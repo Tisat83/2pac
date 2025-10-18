@@ -8,15 +8,21 @@ services:
     image: 2pacru-web:latest
     container_name: 2pacru-web
     restart: unless-stopped
+
+    # ВАЖНО: подключаем .env, который пишет workflow (COMMIT, VERSION)
+    env_file:
+      - .env
+
+    # Остальные системные переменные — здесь
     environment:
       - NODE_ENV=production
       - PORT=3000
       - HOSTNAME=0.0.0.0
-      - COMMIT=${COMMIT:-unknown}
-      - VERSION=${VERSION:-unknown}
       - SERVICE_NAME=2pac.ru
+
     ports:
       - "127.0.0.1:3005:3000"
+
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
