@@ -27,16 +27,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node to read package version
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - name: Export PACKAGE_VERSION and SHORT SHA
-        shell: bash
-        run: |
-          node -e "const fs=require('fs'),v=require('./package.json').version,e=process.env.GITHUB_ENV;fs.appendFileSync(e,'PACKAGE_VERSION='+v+'\n');fs.appendFileSync(e,'SHORT_SHA='+process.env.GITHUB_SHA.slice(0,7)+'\n');"
-
       - name: Prepare SSH key
         shell: bash
         run: |
@@ -61,19 +51,7 @@ jobs:
           set -eu
           rsync -az --delete             --exclude ".git"             --exclude "node_modules"             --exclude ".next"             -e "ssh -i ~/.ssh/id_ci"             ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
 
-      - name: Write release .env on server (COMMIT, VERSION)
-        shell: bash
-        env:
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-        run: |
-          set -eu
-          ssh -i ~/.ssh/id_ci "${DEPLOY_USER}@${DEPLOY_HOST}" "cd "${DEPLOY_PATH}" && printf 'COMMIT=%s
-VERSION=%s
-' "$SHORT_SHA" "$PACKAGE_VERSION" > .env && echo 'Wrote .env:' && cat .env"
-
-      - name: Compose up on server
+      - name: Build & Up (write .env with COMMIT/VERSION)
         shell: bash
         run: |
           set -eu
@@ -82,6 +60,12 @@ VERSION=%s
             export DOCKER_BUILDKIT=1
             export COMPOSE_DOCKER_CLI_BUILD=1
             cd "${{ secrets.DEPLOY_PATH }}"
+            # Write .env from repo package.json and Actions SHA
+            COMMIT="$(echo "${GITHUB_SHA}" | cut -c1-7)"
+            VERSION="$(node -p "require('./package.json').version" || echo "unknown")"
+            printf "COMMIT=%s\nVERSION=%s\n" "\${COMMIT}" "\${VERSION}" > .env
+            echo "Wrote .env:"; cat .env
+            # Recreate stack on port 3005
             docker compose down || true
             docker ps --filter "publish=3005" --format "{{.ID}}" | xargs -r docker stop
             docker ps -a --filter "publish=3005" --format "{{.ID}}" | xargs -r docker rm
@@ -96,7 +80,7 @@ VERSION=%s
         run: |
           set -eu
           URL="http://2pac.ru/api/health"
-          echo "Checking $URL ..."
+          echo "Checking \$URL ..."
           for i in $(seq 1 30); do
             CODE=$(curl -s -o /tmp/health.json -w "%{http_code}" "$URL" || true)
             if [ "$CODE" = "200" ] && grep -q '"status":"ok"' /tmp/health.json; then
