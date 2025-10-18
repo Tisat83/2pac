@@ -33,15 +33,8 @@ jobs:
           node-version: '18'
 
       - name: Export PACKAGE_VERSION and SHORT SHA
-        run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const v = require('./package.json').version;
-          fs.appendFileSync(process.env.GITHUB_ENV, 'PACKAGE_VERSION=' + v + '
-');
-          fs.appendFileSync(process.env.GITHUB_ENV, 'GITHUB_SHA_SHORT=' + process.env.GITHUB_SHA.slice(0,7) + '
-');
-          NODE
+  run: |
+    node -e "const fs=require('fs');const v=require('./package.json').version;fs.appendFileSync(process.env.GITHUB_ENV,'PACKAGE_VERSION='+v+'\n');fs.appendFileSync(process.env.GITHUB_ENV,'GITHUB_SHA_SHORT='+process.env.GITHUB_SHA.slice(0,7)+'\n');"
 
       - name: Prepare SSH key
         run: |
@@ -67,7 +60,7 @@ jobs:
             --exclude "node_modules" \
             --exclude ".next" \
             -e "ssh -i ~/.ssh/id_ci" \
-            ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}" 
+            ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
 
       - name: Write release .env on server (COMMIT, VERSION)
         env:
