@@ -30,13 +30,15 @@ jobs:
       - name: Setup Node to read package version
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: 18
 
       - name: Export PACKAGE_VERSION and SHORT SHA
-  run: |
-    node -e "const fs=require('fs');const v=require('./package.json').version;fs.appendFileSync(process.env.GITHUB_ENV,'PACKAGE_VERSION='+v+'\n');fs.appendFileSync(process.env.GITHUB_ENV,'GITHUB_SHA_SHORT='+process.env.GITHUB_SHA.slice(0,7)+'\n');"
+        shell: bash
+        run: |
+          node -e "const fs=require('fs'),v=require('./package.json').version,e=process.env.GITHUB_ENV;fs.appendFileSync(e,'PACKAGE_VERSION='+v+'\n');fs.appendFileSync(e,'SHORT_SHA='+process.env.GITHUB_SHA.slice(0,7)+'\n');"
 
       - name: Prepare SSH key
+        shell: bash
         run: |
           set -eu
           umask 077
@@ -46,42 +48,33 @@ jobs:
           ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Test SSH connectivity
+        shell: bash
         run: ssh -i ~/.ssh/id_ci "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "echo ok"
 
       - name: Sync repo to server (rsync)
+        shell: bash
         env:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           set -eu
-          rsync -az --delete \
-            --exclude ".git" \
-            --exclude "node_modules" \
-            --exclude ".next" \
-            -e "ssh -i ~/.ssh/id_ci" \
-            ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
+          rsync -az --delete             --exclude ".git"             --exclude "node_modules"             --exclude ".next"             -e "ssh -i ~/.ssh/id_ci"             ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
 
       - name: Write release .env on server (COMMIT, VERSION)
+        shell: bash
         env:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           set -eu
-          # Use heredoc where runner variables expand (unquoted EOF)
-          ssh -i ~/.ssh/id_ci "${DEPLOY_USER}@${DEPLOY_HOST}" << EOF
-            set -euo pipefail
-            cd "${DEPLOY_PATH}"
-            cat > .env <<EOT
-            COMMIT=${GITHUB_SHA_SHORT}
-            VERSION=${PACKAGE_VERSION}
-            EOT
-            echo "Wrote .env:"
-            cat .env
-          EOF
+          ssh -i ~/.ssh/id_ci "${DEPLOY_USER}@${DEPLOY_HOST}" "cd "${DEPLOY_PATH}" && printf 'COMMIT=%s
+VERSION=%s
+' "$SHORT_SHA" "$PACKAGE_VERSION" > .env && echo 'Wrote .env:' && cat .env"
 
       - name: Compose up on server
+        shell: bash
         run: |
           set -eu
           ssh -i ~/.ssh/id_ci "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" << EOF
@@ -99,6 +92,7 @@ jobs:
           EOF
 
       - name: Post-deploy health check
+        shell: bash
         run: |
           set -eu
           URL="http://2pac.ru/api/health"
