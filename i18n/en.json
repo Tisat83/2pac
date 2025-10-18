@@ -1,0 +1,18 @@
+{
+  "site": {
+    "title": "2Pac — In Memory",
+    "ctaBio": "Full biography",
+    "ctaStart": "Start here"
+  },
+  "nav": {
+    "biography": "Biography",
+    "discography": "Discography",
+    "videos": "Videos",
+    "stories": "Stories",
+    "photos": "Photos",
+    "contact": "Contacts"
+  },
+  "home": {
+    "intro": "An iconic artist whose legacy inspires generations."
+  }
+}
